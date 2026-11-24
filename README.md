@@ -5,11 +5,9 @@ You can start by creating a public server with your friends being able to join y
 ## Additional
 This socket-to-socket connection uses TCP for it's connection and TLS for it's encyption and handling.
 
----
-
 ## Stack
-- Java
-- Sockets
+- Java 27
+- Maven 27
 - TCP
 - TLS
 - Docker

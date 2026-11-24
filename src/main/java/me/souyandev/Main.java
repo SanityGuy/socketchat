@@ -1,36 +1,31 @@
+
 package me.souyandev;
 
 import java.util.Scanner;
 
 public class Main {
-    public static void main(String[] args){
+
+    public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
-        System.out.print("Enter username: ");
-        String username = scanner.nextLine();
+        System.out.println("================================");
+        System.out.println("          SocketChat");
+        System.out.println("================================");
 
-        if (username.isEmpty()) {
-            System.out.println("Username cannot be empty!");
+        System.out.print("Enter username: ");
+        String username = scanner.nextLine().trim();
+
+        if (username.isEmpty() || username.length() > 20) {
+            System.out.println("Invalid username. Use 1-20 characters.");
             return;
         }
 
-        System.out.println("\nWelcome to SocketChat, "+username+"!");
-        System.out.println("Type /quit to exit.");
+        System.out.println("\nHello, " + username + "!");
 
-        while (true) {
-            System.out.print("New message: ");
-            String message = scanner.nextLine();
+        Client client = new Client();
+        client.connect(username, scanner);
+        scanner.close();
 
-            if (message.equalsIgnoreCase("/quit")) {
-                System.out.println("Goodbye, "+username+"!");
-                break;
-            }
-
-            if (message.isBlank()){
-                continue;
-            }
-
-            System.out.println("["+username+"] : "+message);
-        }
+        System.out.println("SocketChat closed.");
     }
 }
