@@ -1,5 +1,5 @@
 
-package me.souyandev;
+package me.souyandev.network;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -42,7 +42,7 @@ public class Client {
                     String message;
 
                     while ((message = reader.readLine()) != null) {
-                        System.out.println("\n" + message);
+                        System.out.println(message);
                         System.out.print("New message: ");
                     }
 

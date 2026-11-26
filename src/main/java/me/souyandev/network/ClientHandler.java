@@ -1,5 +1,5 @@
 
-package me.souyandev;
+package me.souyandev.network;
 
 import java.io.BufferedReader;
 import java.io.IOException;
