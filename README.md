@@ -187,7 +187,7 @@ Contributions, suggestions, and bug reports are welcome.
 
 ## License
 
-No license has been specified yet. All rights are reserved unless a license is added to this repository.
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
