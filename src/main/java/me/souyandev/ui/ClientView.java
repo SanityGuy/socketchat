@@ -1,12 +1,21 @@
 
 package me.souyandev.ui;
 
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import me.souyandev.network.Client;
 
 public class ClientView extends BorderPane {
+    private final Client client = new Client();
+    private final TextArea messages = new TextArea();
+    private final TextField input = new TextField();
+    private final Button send = new Button("Send");
+    private final Button disconnect = new Button("Disconnect");
+    private final Label status = new Label("Connecting...");
+
     public ClientView(MainMenu.ClientConfig config) {
         getStyleClass().add("workspace");
 
@@ -18,50 +27,46 @@ public class ClientView extends BorderPane {
         );
         connection.getStyleClass().add("subtitle");
 
-        Button disconnect = new Button("Disconnect");
         disconnect.getStyleClass().add("danger-button");
+        disconnect.setDisable(true);
+        disconnect.setOnAction(event -> client.disconnect());
 
-        Label status = new Label("Awaiting network integration");
         status.getStyleClass().add("status-label");
-
-        disconnect.setOnAction(event -> {
-            status.setText("Disconnected");
-            disconnect.setDisable(true);
-        });
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         HBox header = new HBox(
-                12, new VBox(5, title, connection), spacer, disconnect
+                12,
+                new VBox(5, title, connection),
+                spacer,
+                disconnect
         );
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(20));
 
         ListView<String> users = new ListView<>();
-        users.setPlaceholder(new Label("No connected users"));
+        users.setPlaceholder(new Label("User list is server-managed"));
 
-        Label usersTitle = new Label("Users");
+        Label usersTitle = new Label("Connected Users");
         usersTitle.getStyleClass().add("section-title");
 
         VBox sidebar = new VBox(14, usersTitle, users);
         sidebar.setPadding(new Insets(20));
         sidebar.setPrefWidth(220);
         sidebar.getStyleClass().add("sidebar");
-        VBox.setVgrow(users, Priority.ALWAYS);
 
-        TextArea messages = new TextArea();
         messages.setEditable(false);
         messages.setWrapText(true);
-        messages.setPromptText("Messages will appear here.");
 
-        TextField input = new TextField();
         input.setPromptText("Write a message...");
         input.setDisable(true);
 
-        Button send = new Button("Send");
         send.getStyleClass().add("primary-button");
         send.setDisable(true);
+
+        send.setOnAction(event -> sendMessage());
+        input.setOnAction(event -> sendMessage());
 
         HBox composer = new HBox(10, input, send);
         composer.setAlignment(Pos.CENTER);
@@ -74,5 +79,67 @@ public class ClientView extends BorderPane {
         setTop(header);
         setLeft(sidebar);
         setCenter(content);
+
+        connect(config);
+    }
+
+    private void connect(MainMenu.ClientConfig config) {
+        client.connect(
+                config.host(),
+                config.port(),
+                config.username(),
+                new Client.Listener() {
+                    @Override
+                    public void onConnected() {
+                        Platform.runLater(() -> {
+                            status.setText("Connected");
+                            input.setDisable(false);
+                            send.setDisable(false);
+                            disconnect.setDisable(false);
+                            messages.appendText("Connected to server.\n");
+                        });
+                    }
+
+                    @Override
+                    public void onMessage(String message) {
+                        Platform.runLater(() ->
+                                messages.appendText(message + "\n")
+                        );
+                    }
+
+                    @Override
+                    public void onDisconnected(String reason) {
+                        Platform.runLater(() -> {
+                            status.setText(reason);
+                            input.setDisable(true);
+                            send.setDisable(true);
+                            disconnect.setDisable(true);
+                            messages.appendText(reason + "\n");
+                        });
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        Platform.runLater(() -> {
+                            status.setText("Connection failed");
+                            messages.appendText("ERROR: " + message + "\n");
+                            disconnect.setDisable(true);
+                        });
+                    }
+                }
+        );
+    }
+
+    private void sendMessage() {
+        String message = input.getText().trim();
+
+        if (message.isEmpty()) return;
+
+        client.sendMessage(message);
+        input.clear();
+    }
+
+    public void shutdown() {
+        client.disconnect();
     }
 }

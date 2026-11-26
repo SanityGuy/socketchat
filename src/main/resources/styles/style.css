@@ -81,6 +81,10 @@
     -fx-cursor: hand;
 }
 
+.danger-button:hover {
+    -fx-background-color: #a83c48;
+}
+
 .workspace {
     -fx-background-color: #101722;
 }
@@ -92,8 +96,7 @@
 }
 
 .status-label {
-    -fx-font-size: 12px;
-    -fx-text-fill: #60a5fa;
+    -fx-font-weight: bold;
 }
 
 .section-title {
@@ -107,8 +110,18 @@
     -fx-border-color: transparent #28384d transparent transparent;
 }
 
-.text-area,
-.text-field,
+.text-area {
+    -fx-font-size: 13px;
+    -fx-highlight-fill: #2878d0;
+    -fx-highlight-text-fill: white;
+}
+
+.text-field:focused,
+.text-area:focused {
+    -fx-border-color: #2878d0;
+    -fx-border-width: 1.2px;
+}
+
 .list-view {
     -fx-background-color: #192536;
     -fx-text-fill: #e2e8f0;
@@ -116,6 +129,10 @@
     -fx-background-radius: 8px;
     -fx-border-color: #28384d;
     -fx-border-radius: 8px;
+}
+
+.list-view .list-cell:empty {
+    -fx-background-color: transparent;
 }
 
 .text-area .content {

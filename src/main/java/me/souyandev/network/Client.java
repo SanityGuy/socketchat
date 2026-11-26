@@ -7,67 +7,124 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.Scanner;
 
 public class Client {
+    public interface Listener {
+        void onConnected();
+        void onMessage(String message);
+        void onDisconnected(String reason);
+        void onError(String message);
+    }
 
-    private static final String HOST = "127.0.0.1";
-    private static final int PORT = 5000;
+    private volatile Socket socket;
+    private volatile PrintWriter writer;
+    private volatile boolean connected;
+    private Listener listener;
 
-    public void connect(String username, Scanner scanner) {
-        System.out.println("Connecting to " + HOST + ":" + PORT + "...");
+    public void connect(String host, int port, String username, Listener listener) {
+        this.listener = listener;
 
-        try (
-                Socket socket = new Socket(HOST, PORT);
+        Thread thread = new Thread(() -> {
+            try {
+                Socket connection = new Socket(host, port);
+                socket = connection;
+
                 BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                PrintWriter writer = new PrintWriter(
-                        socket.getOutputStream(), true, StandardCharsets.UTF_8)
-        ) {
-            writer.println(username);
+                        new InputStreamReader(
+                                connection.getInputStream(),
+                                StandardCharsets.UTF_8
+                        )
+                );
 
-            String response = reader.readLine();
+                PrintWriter output = new PrintWriter(
+                        connection.getOutputStream(),
+                        true,
+                        StandardCharsets.UTF_8
+                );
 
-            if (!"CONNECTED".equals(response)) {
-                System.out.println("Connection rejected: " + response);
-                return;
-            }
+                writer = output;
+                output.println(username);
 
-            System.out.println("Connected successfully!");
-            System.out.println("Welcome to SocketChat, " + username + "!");
-            System.out.println("Type /quit to disconnect.\n");
+                String response = reader.readLine();
 
-            Thread receiver = new Thread(() -> {
-                try {
-                    String message;
-
-                    while ((message = reader.readLine()) != null) {
-                        System.out.println(message);
-                        System.out.print("New message: ");
-                    }
-
-                    System.out.println("\nServer disconnected.");
-
-                } catch (IOException e) {
-                    System.out.println("\nConnection closed.");
+                if (!"CONNECTED".equals(response)) {
+                    throw new IOException(
+                            response == null ? "Server rejected connection." : response
+                    );
                 }
-            });
 
-            receiver.setDaemon(true);
-            receiver.start();
+                connected = true;
 
-            while (scanner.hasNextLine()) {
-                String message = scanner.nextLine();
-                if (message.equalsIgnoreCase("/quit")) break;
-                if (message.isBlank()) continue;
+                if (listener != null) {
+                    listener.onConnected();
+                }
 
-                writer.println(message);
+                String message;
+
+                while (connected && (message = reader.readLine()) != null) {
+                    if (listener != null) {
+                        listener.onMessage(message);
+                    }
+                }
+
+                if (connected) {
+                    notifyDisconnected("Server disconnected.");
+                }
+
+            } catch (IOException e) {
+                if (connected) {
+                    notifyDisconnected("Connection closed.");
+                } else if (listener != null) {
+                    listener.onError(e.getMessage());
+                }
+            } finally {
+                connected = false;
+                closeSocket();
             }
+        }, "SocketChat-Client");
 
-            System.out.println("Disconnecting...");
+        thread.setDaemon(true);
+        thread.start();
+    }
 
-        } catch (IOException e) {
-            System.err.println("Connection error: " + e.getMessage());
+    public void sendMessage(String message) {
+        if (!connected || writer == null || message.isBlank()) return;
+
+        writer.println(message);
+
+        if (writer.checkError()) {
+            disconnect();
+        }
+    }
+
+    public void disconnect() {
+        if (!connected && socket == null) return;
+
+        connected = false;
+        closeSocket();
+        notifyDisconnected("Disconnected by user.");
+    }
+
+    public boolean isConnected() {
+        return connected;
+    }
+
+    private void notifyDisconnected(String reason) {
+        if (listener != null) {
+            listener.onDisconnected(reason);
+        }
+    }
+
+    private void closeSocket() {
+        Socket current = socket;
+        socket = null;
+        writer = null;
+
+        if (current != null) {
+            try {
+                current.close();
+            } catch (IOException ignored) {
+            }
         }
     }
 }

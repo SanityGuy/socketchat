@@ -9,7 +9,6 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 public class ClientHandler implements Runnable {
-
     private final Socket socket;
     private final Server server;
 
@@ -28,14 +27,22 @@ public class ClientHandler implements Runnable {
         try (
                 Socket connection = socket;
                 BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8));
+                        new InputStreamReader(
+                                connection.getInputStream(),
+                                StandardCharsets.UTF_8
+                        )
+                );
                 PrintWriter output = new PrintWriter(
-                        connection.getOutputStream(), true, StandardCharsets.UTF_8)
+                        connection.getOutputStream(),
+                        true,
+                        StandardCharsets.UTF_8
+                )
         ) {
             writer = output;
             username = reader.readLine();
 
-            if (username == null || username.isBlank() || username.length() > 20) {
+            if (username == null || username.isBlank()
+                    || username.trim().length() > 20) {
                 send("ERROR: Invalid username.");
                 return;
             }
@@ -49,11 +56,14 @@ public class ClientHandler implements Runnable {
 
             registered = true;
             writer.println("CONNECTED");
+
             server.broadcast("[SERVER] " + username + " joined the chat.");
 
             String message;
+
             while ((message = reader.readLine()) != null) {
                 if (message.isBlank()) continue;
+
                 if (message.length() > 2000) {
                     send("[SERVER] Message is too long.");
                     continue;
@@ -62,9 +72,7 @@ public class ClientHandler implements Runnable {
                 server.broadcast("[" + username + "] : " + message);
             }
 
-        } catch (IOException e) {
-            System.out.println("Connection error: " + e.getMessage());
-
+        } catch (IOException ignored) {
         } finally {
             if (registered) {
                 server.unregister(username, this);
@@ -73,9 +81,20 @@ public class ClientHandler implements Runnable {
         }
     }
 
+    public String getUsername() {
+        return username;
+    }
+
     public synchronized void send(String message) {
         if (writer != null) {
             writer.println(message);
+        }
+    }
+
+    public void close() {
+        try {
+            socket.close();
+        } catch (IOException ignored) {
         }
     }
 }

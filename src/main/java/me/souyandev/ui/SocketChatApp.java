@@ -37,17 +37,27 @@ public class SocketChatApp extends Application {
         stage.show();
     }
 
+
     private void openServer() {
+        ServerView view = new ServerView();
+
         Tab tab = new Tab("Server");
-        tab.setContent(new ServerView());
+        tab.setContent(view);
+        tab.setOnClosed(event -> view.shutdown());
+
         tabs.getTabs().add(tab);
         tabs.getSelectionModel().select(tab);
     }
 
     private void openClient(MainMenu.ClientConfig config) {
+        ClientView view = new ClientView(config);
+
         Tab tab = new Tab("Client: " + config.username());
-        tab.setContent(new ClientView(config));
+        tab.setContent(view);
+        tab.setOnClosed(event -> view.shutdown());
+
         tabs.getTabs().add(tab);
         tabs.getSelectionModel().select(tab);
     }
+
 }

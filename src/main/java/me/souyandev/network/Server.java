@@ -4,57 +4,130 @@ package me.souyandev.network;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class Server {
+    public interface Listener {
+        void onStatus(String message);
+        void onMessage(String message);
+        void onUsersChanged(java.util.List<String> users);
+    }
 
-    private static final int PORT = 5000;
+    private final Map<String, ClientHandler> clients = new ConcurrentHashMap<>();
+    private volatile ServerSocket serverSocket;
+    private volatile boolean running;
+    private Listener listener;
 
-    private final ConcurrentHashMap<String, ClientHandler> clients = new ConcurrentHashMap<>();
+    public void start(int port, Listener listener) {
+        if (running) return;
 
-    public void start() {
-        System.out.println("================================");
-        System.out.println("       SocketChat Server");
-        System.out.println("================================");
-        System.out.println("Starting on port " + PORT + "...");
+        this.listener = listener;
 
-        try (ServerSocket server = new ServerSocket(PORT)) {
-            System.out.println("Server is online.");
-            System.out.println("Waiting for connections...\n");
+        Thread serverThread = new Thread(() -> {
+            try (ServerSocket server = new ServerSocket(port)) {
+                serverSocket = server;
+                running = true;
 
-            while (true) {
-                Socket socket = server.accept();
+                status("Server started on port " + port);
 
-                ClientHandler handler = new ClientHandler(socket, this);
-                Thread thread = new Thread(handler);
+                while (running) {
+                    Socket socket = server.accept();
+                    ClientHandler handler = new ClientHandler(socket, this);
 
-                thread.start();
+                    Thread clientThread = new Thread(handler);
+                    clientThread.setDaemon(true);
+                    clientThread.start();
+                }
+            } catch (IOException e) {
+                if (running) {
+                    status("Server error: " + e.getMessage());
+                }
+            } finally {
+                running = false;
+                serverSocket = null;
+                disconnectAll();
+                status("Server stopped");
             }
+        }, "SocketChat-Server");
 
-        } catch (IOException e) {
-            System.err.println("Server error: " + e.getMessage());
+        serverThread.setDaemon(true);
+        serverThread.start();
+    }
+
+    public void stop() {
+        running = false;
+
+        ServerSocket server = serverSocket;
+
+        if (server != null) {
+            try {
+                server.close();
+            } catch (IOException ignored) {
+            }
         }
+
+        disconnectAll();
+    }
+
+    public boolean isRunning() {
+        return running;
     }
 
     public boolean register(String username, ClientHandler handler) {
-        String key = username.toLowerCase();
+        String key = username.toLowerCase(Locale.ROOT);
 
-        return clients.putIfAbsent(key, handler) == null;
+        boolean registered = clients.putIfAbsent(key, handler) == null;
+
+        if (registered) {
+            notifyUsersChanged();
+        }
+
+        return registered;
     }
 
     public void unregister(String username, ClientHandler handler) {
-        clients.remove(username.toLowerCase(), handler);
+        if (username == null) return;
+
+        clients.remove(username.toLowerCase(Locale.ROOT), handler);
+        notifyUsersChanged();
     }
 
     public void broadcast(String message) {
-        System.out.println(message);
-
         for (ClientHandler client : clients.values()) {
             client.send(message);
         }
+
+        if (listener != null) {
+            listener.onMessage(message);
+        }
     }
 
-    public static void main(String[] args) {
-        new Server().start();
+    public void disconnectAll() {
+        for (ClientHandler client : clients.values()) {
+            client.close();
+        }
+
+        clients.clear();
+        notifyUsersChanged();
+    }
+
+    private void notifyUsersChanged() {
+        if (listener != null) {
+            listener.onUsersChanged(
+                    clients.values().stream()
+                            .map(ClientHandler::getUsername)
+                            .filter(username -> username != null)
+                            .sorted(String.CASE_INSENSITIVE_ORDER)
+                            .toList()
+            );
+        }
+    }
+
+    private void status(String message) {
+        if (listener != null) {
+            listener.onStatus(message);
+        }
     }
 }
